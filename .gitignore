@@ -4,3 +4,6 @@ PT.exe
 *.exp
 *.lib
 *.bmp
+*.png
+*.cubin
+*.asm

@@ -5,8 +5,8 @@
 
 #define RENDER_WIDTH 1024
 #define RENDER_HEIGHT 1024
-#define TILE_SIZE 1
-#define SPP 1024
+#define TILE_SIZE 16
+#define SPP 128
 #define RR_RATE 0.8
 #define PI 3.1415926
 
@@ -71,10 +71,6 @@ __host__ void save_image(unsigned char* target_img, int width, int height)
 }
 
 // 3D resources
-struct Ray {
-    float3 src_point;
-    float2 dst_point;
-};
 
 struct Trianle {
     float3 tri_a;
@@ -369,7 +365,7 @@ __device__ float ray_generation(float3 pixel_center_position, curandState* curan
         */
     }
 
-    // printf("Ray General : %f\n", pixel_radiance);
+    // printf("Ray General : %f\n", 1.0 / SPP * d_light_irradiance);
     return pixel_radiance;
 }
 
@@ -381,19 +377,21 @@ __global__ void render_pixel(unsigned char* target_img, curandState* curand_stat
     int target_pixel_height = blockIdx.y * TILE_SIZE + threadIdx.y;
     // printf("%d, %d\n", target_pixel_width, target_pixel_height);
 
+    // printf("%f %f %f\n", d_camera_position.x, d_camera_position.y, d_camera_position.z);
+
     float3 delta = make_float3((target_pixel_width + 0.5 - RENDER_WIDTH / 2.0) * d_camera_pixel_width, d_camera_focal_length, (target_pixel_height + 0.5 - RENDER_HEIGHT / 2.0) * d_camera_pixel_height);
     float3 pixel_center = make_float3(d_camera_position.x + delta.x, d_camera_position.y + delta.y, d_camera_position.z + delta.z);
     float pixel_radiance = ray_generation(pixel_center, curand_states);
-    // float pixel_radiance = 20;
+    // float pixel_radiance = d_light_irradiance * curand_uniform(&curand_states[threadIdx.x]);
 
     // printf("%d, %d : %f\n", target_pixel_width, target_pixel_height, pixel_radiance);
-    if (pixel_radiance > d_light_irradiance) {
-        pixel_radiance = d_light_irradiance;
-    }
+    // if (pixel_radiance > d_light_irradiance) {
+    //     pixel_radiance = d_light_irradiance;
+    // }
     unsigned char rgb_value = (unsigned char)(pixel_radiance / d_light_irradiance * 255);
     // printf("%d, %d : %d\n", target_pixel_width, target_pixel_height, rgb_value);
     int base_idx = 3 * (target_pixel_height * RENDER_WIDTH + target_pixel_width);
-    target_img[base_idx] = 55;
+    target_img[base_idx] = 155;
     target_img[base_idx + 1] = rgb_value;
     target_img[base_idx + 2] = rgb_value;
 }
