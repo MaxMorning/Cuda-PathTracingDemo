@@ -6,7 +6,7 @@
 #define RENDER_WIDTH 1024
 #define RENDER_HEIGHT 1024
 #define TILE_SIZE 16
-#define SPP 128
+#define SPP 1024
 #define RR_RATE 0.8
 #define PI 3.1415926
 
@@ -322,7 +322,7 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
 
         int hit_obj_idx;
         float3 hit_point = check_obj_hit(object_idx, src_point, ray_direction, hit_obj_idx);
-        if (hit_obj_idx > -1) {
+        if (hit_obj_idx > -1 && !d_scene_objects[hit_obj_idx].is_light) {
             // printf("Hit Object!\n");
             ray_direction.x *= -1;
             ray_direction.y *= -1;
@@ -352,7 +352,6 @@ __device__ float ray_generation(float3 pixel_center_position, curandState* curan
             // printf("Ray Hit!\n");
             pixel_radiance += 1.0 / SPP * d_light_irradiance;
         }
-        /*
         else {
             float3 hit_point = check_obj_hit(-1, d_camera_position, ray_direction, hit_obj_idx);
             if (hit_obj_idx > -1) {
@@ -362,7 +361,6 @@ __device__ float ray_generation(float3 pixel_center_position, curandState* curan
                 // printf("Ray Obj General : %f\n", pixel_radiance);
             }
         }
-        */
     }
 
     // printf("Ray General : %f\n", 1.0 / SPP * d_light_irradiance);
@@ -391,7 +389,7 @@ __global__ void render_pixel(unsigned char* target_img, curandState* curand_stat
     unsigned char rgb_value = (unsigned char)(pixel_radiance / d_light_irradiance * 255);
     // printf("%d, %d : %d\n", target_pixel_width, target_pixel_height, rgb_value);
     int base_idx = 3 * (target_pixel_height * RENDER_WIDTH + target_pixel_width);
-    target_img[base_idx] = 155;
+    target_img[base_idx] = rgb_value;
     target_img[base_idx + 1] = rgb_value;
     target_img[base_idx + 2] = rgb_value;
 }
@@ -422,7 +420,7 @@ int main()
     }
 
     // cudaMemcpyToSymbol(d_light_triangle, h_light_triangle, sizeof(Trianle) * LIGHT_TRI_COUNT, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(d_scene_objects, h_scene_objects, sizeof(Trianle) * OBJ_TRI_COUNT, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_scene_objects, h_scene_objects, sizeof(h_scene_objects));
 
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) 
