@@ -3,8 +3,14 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
-#define RENDER_WIDTH 512
-#define RENDER_HEIGHT 512
+#ifdef LARGE
+#define RENDER_WIDTH 1024
+#define RENDER_HEIGHT 1024
+#else
+#define RENDER_WIDTH 128
+#define RENDER_HEIGHT 128
+#endif
+
 #define TILE_SIZE 16
 #define STACK_CAPACITY 128
 #define SHARED_MEM_CAP STACK_CAPACITY * RENDER_WIDTH * RENDER_HEIGHT
