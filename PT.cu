@@ -3,12 +3,12 @@
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
 
-#define RENDER_WIDTH 1024
-#define RENDER_HEIGHT 1024
+#define RENDER_WIDTH 512
+#define RENDER_HEIGHT 512
 #define TILE_SIZE 16
 #define STACK_CAPACITY 128
 #define SHARED_MEM_CAP STACK_CAPACITY * RENDER_WIDTH * RENDER_HEIGHT
-#define SPP 2048
+#define SPP 1024
 #define RR_RATE 0.9
 #define PI 3.1415926
 
@@ -82,6 +82,9 @@ struct Trianle {
     bool is_light;
     float brdf_rate;
 };
+
+/*
+// test scene
 // Light triagles
 #define LIGHT_TRI_COUNT 2
 
@@ -149,12 +152,105 @@ __constant__ Trianle d_scene_objects[OBJ_TRI_COUNT];
 // camera position
 __constant__ float3 d_camera_position = float3{150, -400, 150};
 __constant__ float3 d_camera_direction = float3{0, 1, 0};
+__constant__ float3 d_camera_up_direction = float3{0, 0, 1};
+__constant__ float3 d_camera_left_direction = float3{1, 0, 0};
 // 浮点精度考虑，设置较大焦距和成像平面
 __constant__ float d_camera_focal_length = 200;
 __constant__ float d_camera_width = 150;
 __constant__ float d_camera_height = 150;
 __constant__ float d_camera_pixel_width = 150.0 / RENDER_WIDTH;
 __constant__ float d_camera_pixel_height= 150.0 / RENDER_HEIGHT;
+*/
+
+
+
+// Cornell box
+#define LIGHT_TRI_COUNT 2
+__constant__ float d_light_irradiance = 42;
+
+#define BRDF_rate 0.74
+#define OBJ_TRI_COUNT 32
+// Trianle{float3{}, float3{}, float3{}, float3{}, false, BRDF_rate},
+Trianle h_scene_objects[] = {
+    // Light triagles
+    Trianle{float3{343.0, 548.799, 227.0}, float3{343.0, 548.799, 332.0}, float3{213.0, 548.799, 332.0}, float3{0, -1, 0}, true, BRDF_rate},
+    Trianle{float3{343.0, 548.799, 227.0}, float3{213.0, 548.799, 227.0}, float3{213.0, 548.799, 332.0}, float3{0, -1, 0}, true, BRDF_rate},
+    
+    // Floor
+    Trianle{float3{552.8, 0.0, 0.0}, float3{0.0, 0.0, 0.0}, float3{0.0, 0.0, 559.2}, float3{0, 1, 0}, false, BRDF_rate},
+    Trianle{float3{552.8, 0.0, 0.0}, float3{549.6, 0.0, 559.2}, float3{0.0, 0.0, 559.2}, float3{0, 1, 0}, false, BRDF_rate},
+
+    // Ceiling
+    Trianle{float3{556.0, 548.8, 0.0}, float3{556.0, 548.8, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, -1, 0}, false, BRDF_rate},
+    Trianle{float3{556.0, 548.8, 0.0}, float3{0.0, 548.8, 0.0}, float3{0.0, 548.8, 559.2}, float3{0, -1, 0}, false, BRDF_rate},
+
+    // Back wall
+    Trianle{float3{549.6, 0.0, 559.2}, float3{0.0, 0.0, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, 0, -1}, false, BRDF_rate},
+    Trianle{float3{549.6, 0.0, 559.2}, float3{556.0, 548.8, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, 0, -1}, false, BRDF_rate},
+
+    // Right wall
+    Trianle{float3{0.0, 0.0, 559.2}, float3{0.0, 0.0, 0.0}, float3{0.0, 548.8, 0.0}, float3{1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{0.0, 0.0, 559.2}, float3{0.0, 548.8, 559.2}, float3{0.0, 548.8, 0.0}, float3{1, 0, 0}, false, BRDF_rate},
+
+    // Left wall
+    Trianle{float3{552.8, 0.0, 0.0}, float3{549.6, 0.0, 559.2}, float3{556.0, 548.8, 559.2}, float3{-1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{552.8, 0.0, 0.0}, float3{556.0, 548.8, 0.0}, float3{556.0, 548.8, 559.2}, float3{-1, 0, 0}, false, BRDF_rate},
+    
+    // Short block
+    // Top
+    Trianle{float3{130.0, 165.0, 65.0}, float3{82.0, 165.0, 225.0}, float3{240.0, 165.0, 272.0}, float3{0, 1, 0}, false, BRDF_rate},
+    Trianle{float3{130.0, 165.0, 65.0}, float3{290.0, 165.0, 114.0}, float3{240.0, 165.0, 272.0}, float3{0, 1, 0}, false, BRDF_rate},
+    
+    // Left
+    Trianle{float3{290.0, 0.0, 114.0}, float3{290.0, 165.0, 114.0}, float3{240.0, 165.0, 272.0}, float3{-0.9534, 0, -0.301709}, false, BRDF_rate},
+    Trianle{float3{290.0, 0.0, 114.0}, float3{240.0, 0.0, 272.0}, float3{240.0, 165.0, 272.0}, float3{-0.9534, 0, -0.301709}, false, BRDF_rate},
+    
+    // Front
+    Trianle{float3{130.0, 0.0, 65.0}, float3{130.0, 165.0, 65.0}, float3{290.0, 165.0, 114.0}, float3{-0.292826, 0, -0.956166}, false, BRDF_rate},
+    Trianle{float3{130.0, 0.0, 65.0}, float3{290.0, 0.0, 114.0}, float3{290.0, 165.0, 114.0}, float3{-0.292826, 0, -0.956166}, false, BRDF_rate},
+
+    // Right
+    Trianle{float3{82.0, 0.0, 225.0}, float3{82.0, 165.0, 225.0}, float3{130.0, 165.0, 65.0}, float3{-0.957826, 0, -0.287348}, false, BRDF_rate},
+    Trianle{float3{82.0, 0.0, 225.0}, float3{130.0, 0.0, 65.0}, float3{130.0, 165.0, 65.0}, float3{-0.957826, 0, -0.287348}, false, BRDF_rate},
+    
+    // Behind
+    Trianle{float3{240.0, 0.0, 272.0}, float3{240.0, 165.0, 272.0}, float3{82.0, 165.0, 225.0}, float3{-0.285121, 0, -0.958492}, false, BRDF_rate},
+    Trianle{float3{240.0, 0.0, 272.0}, float3{82.0, 0.0, 225.0}, float3{82.0, 165.0, 225.0}, float3{-0.285121, 0, -0.958492}, false, BRDF_rate},
+
+    // Tall block
+    // Top
+    Trianle{float3{423.0, 330.0, 247.0}, float3{265.0, 330.0, 296.0}, float3{314.0, 330.0, 456.0}, float3{0, 1, 0}, false, BRDF_rate},
+    Trianle{float3{423.0, 330.0, 247.0}, float3{472.0, 330.0, 406.0}, float3{314.0, 330.0, 456.0}, float3{0, 1, 0}, false, BRDF_rate},
+
+    // Left
+    Trianle{float3{423.0, 0.0, 247.0}, float3{423.0, 330.0, 247.0}, float3{472.0, 330.0, 406.0}, float3{0.955649, 0, -0.294508}, false, BRDF_rate},
+    Trianle{float3{423.0, 0.0, 247.0}, float3{472.0, 0.0, 406.0}, float3{472.0, 330.0, 406.0}, float3{0.955649, 0, -0.294508}, false, BRDF_rate},
+
+    // Behind
+    Trianle{float3{472.0, 0.0, 406.0}, float3{472.0, 330.0, 406.0}, float3{314.0, 330.0, 456.0}, float3{-0.301709, 0, -0.953400}, false, BRDF_rate},
+    Trianle{float3{472.0, 0.0, 406.0}, float3{314.0, 0.0, 456.0}, float3{314.0, 330.0, 456.0}, float3{-0.301709, 0, -0.953400}, false, BRDF_rate},
+
+    // Right
+    Trianle{float3{314.0, 0.0, 456.0}, float3{314.0, 330.0, 456.0}, float3{265.0, 330.0, 296.0}, float3{0.956166, 0, -0.292826}, false, BRDF_rate},
+    Trianle{float3{314.0, 0.0, 456.0}, float3{265.0, 0.0, 296.0}, float3{265.0, 330.0, 296.0}, float3{0.956166, 0, -0.292826}, false, BRDF_rate},
+    
+    // Front
+    Trianle{float3{265.0, 0.0, 296.0}, float3{265.0, 330.0, 296.0}, float3{423.0, 330.0, 247.0}, float3{-0.296209, 0, -0.955123}, false, BRDF_rate},
+    Trianle{float3{265.0, 0.0, 296.0}, float3{423.0, 0.0, 247.0}, float3{423.0, 330.0, 247.0}, float3{-0.296209, 0, -0.955123}, false, BRDF_rate}
+};
+
+__constant__ Trianle d_scene_objects[OBJ_TRI_COUNT];
+// camera position
+__constant__ float3 d_camera_position = float3{278, 273, -800};
+__constant__ float3 d_camera_direction = float3{0, 0, 1};
+__constant__ float3 d_camera_up_direction = float3{0, 1, 0};
+__constant__ float3 d_camera_left_direction = float3{-1, 0, 0};
+
+__constant__ float d_camera_focal_length = 3.5;
+__constant__ float d_camera_width = 2.5;
+__constant__ float d_camera_height = 2.5;
+__constant__ float d_camera_pixel_width = 2.5 / RENDER_WIDTH;
+__constant__ float d_camera_pixel_height= 2.5 / RENDER_HEIGHT;
 
 
 __device__ inline float mixed_product(float3 vec_a, float3 vec_b, float3 vec_c)
@@ -401,7 +497,7 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
                 ray_direction.x *= -1;
                 ray_direction.y *= -1;
                 ray_direction.z *= -1;
-                indir_rate = d_scene_objects[hit_obj_idx].brdf_rate * dot(ray_direction, d_scene_objects[hit_obj_idx].normal_line) * 2 / RR_RATE;
+                indir_rate = d_scene_objects[hit_obj_idx].brdf_rate * dot(ray_direction, d_scene_objects[hit_obj_idx].normal_line) / RR_RATE;
                 src_object_idx = hit_obj_idx;
                 ray_src = hit_point;
                 out_direction = ray_direction;
@@ -472,7 +568,10 @@ __global__ void render_pixel(unsigned char* target_img, curandState* curand_stat
 
     // printf("%f %f %f\n", d_camera_position.x, d_camera_position.y, d_camera_position.z);
 
-    float3 delta = make_float3((target_pixel_width + 0.5 - RENDER_WIDTH / 2.0) * d_camera_pixel_width, d_camera_focal_length, (target_pixel_height + 0.5 - RENDER_HEIGHT / 2.0) * d_camera_pixel_height);
+    float3 delta_left = scalar_mult_float3(d_camera_left_direction, (target_pixel_width + 0.5 - RENDER_WIDTH / 2.0) * d_camera_pixel_width);
+    float3 delta_up = scalar_mult_float3(d_camera_up_direction, (target_pixel_height + 0.5 - RENDER_HEIGHT / 2.0) * d_camera_pixel_height);
+    float3 delta = add_float3(delta_left, add_float3(delta_up, scalar_mult_float3(d_camera_direction, d_camera_focal_length)));
+    // float3 delta = make_float3((target_pixel_width + 0.5 - RENDER_WIDTH / 2.0) * d_camera_pixel_width, d_camera_focal_length, (target_pixel_height + 0.5 - RENDER_HEIGHT / 2.0) * d_camera_pixel_height);
     float3 pixel_center = make_float3(d_camera_position.x + delta.x, d_camera_position.y + delta.y, d_camera_position.z + delta.z);
     float pixel_radiance = ray_generation(pixel_center, curand_states);
     // float pixel_radiance = d_light_irradiance * curand_uniform(&curand_states[threadIdx.x]);
