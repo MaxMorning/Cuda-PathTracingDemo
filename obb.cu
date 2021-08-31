@@ -1,7 +1,12 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
+#include <fstream>
+#include <math.h>
 #include <cuda_runtime.h>
 #include <curand_kernel.h>
+
+using namespace std;
 
 #ifdef LARGE
 #define RENDER_WIDTH 1024
@@ -17,6 +22,7 @@
 #define SPP 1024
 #define RR_RATE 0.9
 #define PI 3.1415926
+
 
 // BMP Operation
 // 文件信息头结构体
@@ -78,6 +84,7 @@ __host__ void save_image(unsigned char* target_img, int width, int height)
     fclose(file_ptr);
 }
 
+
 // 3D resources
 
 struct Trianle {
@@ -89,72 +96,15 @@ struct Trianle {
     float brdf_rate;
 };
 
-/*
-// test scene
-// Light triagles
 #define LIGHT_TRI_COUNT 2
+__constant__ float d_light_irradiance = 42;
 
-__constant__ float d_light_irradiance = 40;
+#define BRDF_rate 0.5
+__constant__ int OBJ_TRI_COUNT;
 
-// object triagles
-// No BVH
-#define BRDF_rate 0.6
-
-#define OBJ_TRI_COUNT 24
-Trianle h_scene_objects[] = {
-    // light tri
-    Trianle{float3{110, 110, 300}, float3{110, 190, 300}, float3{190, 110, 300}, float3{0, 0, -1}, true, BRDF_rate},
-    Trianle{float3{190, 110, 300}, float3{110, 190, 300}, float3{190, 190, 300}, float3{0, 0, -1}, true, BRDF_rate},
-    // Trianle{float3{110, 110, 301}, float3{110, 190, 301}, float3{190, 110, 301}, float3{0, 0, 1}, true, BRDF_rate},
-    // Trianle{float3{190, 110, 301}, float3{110, 190, 301}, float3{190, 190, 301}, float3{0, 0, 1}, true, BRDF_rate},
-    // internal box 100 * 100 * 30
-    // top
-    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, BRDF_rate},
-    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, BRDF_rate},
-    // bottom
-    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, BRDF_rate},
-    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, BRDF_rate},
-    // front
-    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 100, 70}, float3{0, -1, 0}, false, BRDF_rate},
-    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{200, 100, 100}, float3{0, -1, 0}, false, BRDF_rate},
-
-    // behind
-    Trianle{float3{100, 200, 100}, float3{200, 200, 100}, float3{100, 200, 70}, float3{0, 1, 0}, false, BRDF_rate},
-    Trianle{float3{100, 200, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{0, 1, 0}, false, BRDF_rate},
-
-    // left
-    Trianle{float3{100, 100, 100}, float3{100, 200, 100}, float3{100, 100, 70}, float3{-1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{100, 100, 70}, float3{100, 200, 70}, float3{100, 200, 100}, float3{-1, 0, 0}, false, BRDF_rate},
-
-    // right
-    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{200, 100, 70}, float3{1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{1, 0, 0}, false, BRDF_rate},
-
-    // general box 300 * 300 * 300.001
-    // top
-    Trianle{float3{0, 0, 300.001}, float3{0, 300, 300.001}, float3{300, 0, 300.001}, float3{0, 0, -1}, false, BRDF_rate},
-    Trianle{float3{0, 300, 300.001}, float3{300, 0, 300.001}, float3{300, 300, 300.001}, float3{0, 0, -1}, false, BRDF_rate},
-
-    // bottom
-    Trianle{float3{0, 0, 0}, float3{0, 300, 0}, float3{300, 0, 0}, float3{0, 0, 1}, false, BRDF_rate},
-    Trianle{float3{0, 300, 0}, float3{300, 0, 0}, float3{300, 300, 0}, float3{0, 0, 1}, false, BRDF_rate},
-
-    // left
-    Trianle{float3{0, 0, 0}, float3{0, 0, 300.001}, float3{0, 300, 300.001}, float3{1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{0, 300, 300.001}, float3{0, 300, 0}, float3{0, 0, 0}, float3{1, 0, 0}, false, BRDF_rate},
-
-    // right
-    Trianle{float3{300, 0, 0}, float3{300, 0, 300.001}, float3{300, 300, 300.001}, float3{-1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{300, 300, 300.001}, float3{300, 300, 0}, float3{300, 0, 0}, float3{-1, 0, 0}, false, BRDF_rate},
-
-    // behind
-    Trianle{float3{0, 300, 0}, float3{0, 300, 300.001}, float3{300, 300, 0}, float3{0, -1, 0}, false, BRDF_rate},
-    Trianle{float3{300, 300, 0}, float3{300, 300, 300.001}, float3{0, 300, 300.001}, float3{0, -1, 0}, false, BRDF_rate}
-};
-
-__constant__ Trianle d_scene_objects[OBJ_TRI_COUNT];
-
-
+// Trianle{float3{}, float3{}, float3{}, float3{}, false, BRDF_rate},
+// Trianle* h_scene_objects;
+__device__ Trianle* d_scene_objects;
 // camera position
 __constant__ float3 d_camera_position = float3{150, -400, 150};
 __constant__ float3 d_camera_direction = float3{0, 1, 0};
@@ -166,98 +116,120 @@ __constant__ float d_camera_width = 150;
 __constant__ float d_camera_height = 150;
 __constant__ float d_camera_pixel_width = 150.0 / RENDER_WIDTH;
 __constant__ float d_camera_pixel_height= 150.0 / RENDER_HEIGHT;
-*/
 
+__host__ void load_obb_file(string file_path)
+{
+    ifstream fin("test.off");
 
+    string head;
+    fin >> head;
+    int point_count, surface_count, temp;
+    fin >> point_count >> surface_count >> temp;
 
-// Cornell box
-#define LIGHT_TRI_COUNT 2
-__constant__ float d_light_irradiance = 42;
+    float3* points = new float3[point_count];
+    float min_x = 214748364;
+    float min_y = 214748364;
+    float min_z = 214748364;
+    float max_x = -214748368;
+    float max_y = -214748368;
+    float max_z = -214748368;
+    for (int i = 0; i < point_count; ++i) {
+        float x, y, z;
+        fin >> x >> y >> z;
+        if (min_x > x) {
+            min_x = x;
+        }
+        if (min_y > y) {
+            min_y = y;
+        }
+        if (min_z > z) {
+            min_z = z;
+        }
+        if (max_x < x) {
+            max_x = x;
+        }
+        if (max_y < y) {
+            max_y = y;
+        }
+        if (max_z < z) {
+            max_z = z;
+        }
+        points[i] = make_float3(x, y, z);
+    }
 
-#define BRDF_rate 0.74
-#define OBJ_TRI_COUNT 32
-// Trianle{float3{}, float3{}, float3{}, float3{}, false, BRDF_rate},
-Trianle h_scene_objects[] = {
-    // Light triagles
-    Trianle{float3{343.0, 548.799, 227.0}, float3{343.0, 548.799, 332.0}, float3{213.0, 548.799, 332.0}, float3{0, -1, 0}, true, BRDF_rate},
-    Trianle{float3{343.0, 548.799, 227.0}, float3{213.0, 548.799, 227.0}, float3{213.0, 548.799, 332.0}, float3{0, -1, 0}, true, BRDF_rate},
-    
-    // Floor
-    Trianle{float3{552.8, 0.0, 0.0}, float3{0.0, 0.0, 0.0}, float3{0.0, 0.0, 559.2}, float3{0, 1, 0}, false, BRDF_rate},
-    Trianle{float3{552.8, 0.0, 0.0}, float3{549.6, 0.0, 559.2}, float3{0.0, 0.0, 559.2}, float3{0, 1, 0}, false, BRDF_rate},
+    printf("%f %f %f %f %f %f\n", min_x, min_y, min_z, max_x, max_y, max_z);
+    float x_scale = 250 / (max_x - min_x);
+    float y_scale = 250 / (max_y - min_y);
+    float z_scale = 250 / (max_z - min_z);
 
+    float scale = 2147483647;
+    if (x_scale < scale) {
+        scale = x_scale;
+    }
+    if (y_scale < scale) {
+        scale = y_scale;
+    }
+    if (z_scale < scale) {
+        scale = z_scale;
+    }
+
+    // printf("%f\n", scale);
+    for (int i = 0; i < point_count; ++i) {
+        points[i].x -= min_x;
+        points[i].x *= scale;
+        points[i].x += 25;
+
+        points[i].y -= min_y;
+        points[i].y *= scale;
+        points[i].y += 25;
+
+        points[i].z -= min_z;
+        points[i].z *= scale;
+        points[i].z += 25;
+    }
+
+    Trianle* h_scene_objects = new Trianle[surface_count + 4];
+    // Light
+    h_scene_objects[0] = Trianle{float3{110, 110, 300}, float3{110, 190, 300}, float3{190, 110, 300}, float3{0, 0, -1}, true, BRDF_rate};
+    h_scene_objects[1] = Trianle{float3{190, 110, 300}, float3{110, 190, 300}, float3{190, 190, 300}, float3{0, 0, -1}, true, BRDF_rate},
     // Ceiling
-    Trianle{float3{556.0, 548.8, 0.0}, float3{556.0, 548.8, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, -1, 0}, false, BRDF_rate},
-    Trianle{float3{556.0, 548.8, 0.0}, float3{0.0, 548.8, 0.0}, float3{0.0, 548.8, 559.2}, float3{0, -1, 0}, false, BRDF_rate},
+    h_scene_objects[2] = Trianle{float3{0, 0, 0}, float3{0, 300, 0}, float3{300, 0, 0}, float3{0, 0, 1}, false, BRDF_rate};
+    h_scene_objects[3] = Trianle{float3{0, 300, 0}, float3{300, 0, 0}, float3{300, 300, 0}, float3{0, 0, 1}, false, BRDF_rate};
+    for (int i = 4; i < surface_count + 4; ++i) {
+        int index_x, index_y, index_z;
+        fin >> temp >> index_x >> index_y >> index_z;
+        float3 yx = make_float3(points[index_y].x - points[index_x].x, points[index_y].y - points[index_x].y, points[index_y].z - points[index_x].z);
+        float3 yz = make_float3(points[index_y].x - points[index_z].x, points[index_y].y - points[index_z].y, points[index_y].z - points[index_z].z);
+        float3 normal_line = make_float3(yx.y * yz.z - yx.z * yz.y, yx.z * yz.x - yx.x * yz.z, yx.x * yz.y - yx.y * yz.x);
+        float normal_length = 1 / sqrt(normal_line.x * normal_line.x + normal_line.y * normal_line.y + normal_line.z * normal_line.z);
+        h_scene_objects[i] = Trianle{points[index_x], points[index_y], points[index_z], float3{normal_length * normal_line.x, normal_length * normal_line.y, normal_length * normal_line.z}, false, BRDF_rate};
+        // printf("%f, %f, %f\n", h_scene_objects[i].normal_line.x, h_scene_objects[i].normal_line.y, h_scene_objects[i].normal_line.z); 
+    }
 
-    // Back wall
-    Trianle{float3{549.6, 0.0, 559.2}, float3{0.0, 0.0, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, 0, -1}, false, BRDF_rate},
-    Trianle{float3{549.6, 0.0, 559.2}, float3{556.0, 548.8, 559.2}, float3{0.0, 548.8, 559.2}, float3{0, 0, -1}, false, BRDF_rate},
+    fin.close();
 
-    // Right wall
-    Trianle{float3{0.0, 0.0, 559.2}, float3{0.0, 0.0, 0.0}, float3{0.0, 548.8, 0.0}, float3{1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{0.0, 0.0, 559.2}, float3{0.0, 548.8, 559.2}, float3{0.0, 548.8, 0.0}, float3{1, 0, 0}, false, BRDF_rate},
+    surface_count += 4;
+    cudaMemcpyToSymbol(OBJ_TRI_COUNT, &surface_count, sizeof(int));
+    cudaError_t cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) 
+    {
+        fprintf(stderr, "copy int launch failed: %s\n", cudaGetErrorString(cudaStatus));
+    }
+    Trianle* temp_scene_objects;
+    cudaMalloc(&temp_scene_objects, sizeof(Trianle) * surface_count);
+    cudaMemcpy(temp_scene_objects, h_scene_objects, sizeof(Trianle) * surface_count, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_scene_objects, &temp_scene_objects, sizeof(Trianle*));
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) 
+    {
+        fprintf(stderr, "copy array launch failed: %s\n", cudaGetErrorString(cudaStatus));
+    }
 
-    // Left wall
-    Trianle{float3{552.8, 0.0, 0.0}, float3{549.6, 0.0, 559.2}, float3{556.0, 548.8, 559.2}, float3{-1, 0, 0}, false, BRDF_rate},
-    Trianle{float3{552.8, 0.0, 0.0}, float3{556.0, 548.8, 0.0}, float3{556.0, 548.8, 559.2}, float3{-1, 0, 0}, false, BRDF_rate},
-    
-    // Short block
-    // Top
-    Trianle{float3{130.0, 165.0, 65.0}, float3{82.0, 165.0, 225.0}, float3{240.0, 165.0, 272.0}, float3{0, 1, 0}, false, BRDF_rate},
-    Trianle{float3{130.0, 165.0, 65.0}, float3{290.0, 165.0, 114.0}, float3{240.0, 165.0, 272.0}, float3{0, 1, 0}, false, BRDF_rate},
-    
-    // Left
-    Trianle{float3{290.0, 0.0, 114.0}, float3{290.0, 165.0, 114.0}, float3{240.0, 165.0, 272.0}, float3{-0.9534, 0, -0.301709}, false, BRDF_rate},
-    Trianle{float3{290.0, 0.0, 114.0}, float3{240.0, 0.0, 272.0}, float3{240.0, 165.0, 272.0}, float3{-0.9534, 0, -0.301709}, false, BRDF_rate},
-    
-    // Front
-    Trianle{float3{130.0, 0.0, 65.0}, float3{130.0, 165.0, 65.0}, float3{290.0, 165.0, 114.0}, float3{-0.292826, 0, -0.956166}, false, BRDF_rate},
-    Trianle{float3{130.0, 0.0, 65.0}, float3{290.0, 0.0, 114.0}, float3{290.0, 165.0, 114.0}, float3{-0.292826, 0, -0.956166}, false, BRDF_rate},
+    delete[] points;
+    delete[] h_scene_objects;
 
-    // Right
-    Trianle{float3{82.0, 0.0, 225.0}, float3{82.0, 165.0, 225.0}, float3{130.0, 165.0, 65.0}, float3{-0.957826, 0, -0.287348}, false, BRDF_rate},
-    Trianle{float3{82.0, 0.0, 225.0}, float3{130.0, 0.0, 65.0}, float3{130.0, 165.0, 65.0}, float3{-0.957826, 0, -0.287348}, false, BRDF_rate},
-    
-    // Behind
-    Trianle{float3{240.0, 0.0, 272.0}, float3{240.0, 165.0, 272.0}, float3{82.0, 165.0, 225.0}, float3{-0.285121, 0, -0.958492}, false, BRDF_rate},
-    Trianle{float3{240.0, 0.0, 272.0}, float3{82.0, 0.0, 225.0}, float3{82.0, 165.0, 225.0}, float3{-0.285121, 0, -0.958492}, false, BRDF_rate},
-
-    // Tall block
-    // Top
-    Trianle{float3{423.0, 330.0, 247.0}, float3{265.0, 330.0, 296.0}, float3{314.0, 330.0, 456.0}, float3{0, 1, 0}, false, BRDF_rate},
-    Trianle{float3{423.0, 330.0, 247.0}, float3{472.0, 330.0, 406.0}, float3{314.0, 330.0, 456.0}, float3{0, 1, 0}, false, BRDF_rate},
-
-    // Left
-    Trianle{float3{423.0, 0.0, 247.0}, float3{423.0, 330.0, 247.0}, float3{472.0, 330.0, 406.0}, float3{0.955649, 0, -0.294508}, false, BRDF_rate},
-    Trianle{float3{423.0, 0.0, 247.0}, float3{472.0, 0.0, 406.0}, float3{472.0, 330.0, 406.0}, float3{0.955649, 0, -0.294508}, false, BRDF_rate},
-
-    // Behind
-    Trianle{float3{472.0, 0.0, 406.0}, float3{472.0, 330.0, 406.0}, float3{314.0, 330.0, 456.0}, float3{-0.301709, 0, -0.953400}, false, BRDF_rate},
-    Trianle{float3{472.0, 0.0, 406.0}, float3{314.0, 0.0, 456.0}, float3{314.0, 330.0, 456.0}, float3{-0.301709, 0, -0.953400}, false, BRDF_rate},
-
-    // Right
-    Trianle{float3{314.0, 0.0, 456.0}, float3{314.0, 330.0, 456.0}, float3{265.0, 330.0, 296.0}, float3{0.956166, 0, -0.292826}, false, BRDF_rate},
-    Trianle{float3{314.0, 0.0, 456.0}, float3{265.0, 0.0, 296.0}, float3{265.0, 330.0, 296.0}, float3{0.956166, 0, -0.292826}, false, BRDF_rate},
-    
-    // Front
-    Trianle{float3{265.0, 0.0, 296.0}, float3{265.0, 330.0, 296.0}, float3{423.0, 330.0, 247.0}, float3{0.296209, 0, 0.955123}, false, BRDF_rate},
-    Trianle{float3{265.0, 0.0, 296.0}, float3{423.0, 0.0, 247.0}, float3{423.0, 330.0, 247.0}, float3{-0.296209, 0, -0.955123}, false, BRDF_rate}
-};
-
-__constant__ Trianle d_scene_objects[OBJ_TRI_COUNT];
-// camera position
-__constant__ float3 d_camera_position = float3{278, 273, -800};
-__constant__ float3 d_camera_direction = float3{0, 0, 1};
-__constant__ float3 d_camera_up_direction = float3{0, 1, 0};
-__constant__ float3 d_camera_left_direction = float3{-1, 0, 0};
-
-__constant__ float d_camera_focal_length = 3.5;
-__constant__ float d_camera_width = 2.5;
-__constant__ float d_camera_height = 2.5;
-__constant__ float d_camera_pixel_width = 2.5 / RENDER_WIDTH;
-__constant__ float d_camera_pixel_height= 2.5 / RENDER_HEIGHT;
-
+    printf("Load Done.\n");
+}
 
 __device__ inline float mixed_product(float3 vec_a, float3 vec_b, float3 vec_c)
 {
@@ -374,69 +346,6 @@ __device__ float3 check_light_hit(int src_tri_idx, float3 src_point, float3 dire
     return hit_point;
 }
 
-/*
-__device__ float shade_recurse(int object_idx, float3 src_point, float3 direction, curandState* curand_state)
-{
-    // Contribution from the light source.
-    float l_dir = 0;
-    for (int i = 0; i < LIGHT_TRI_COUNT; ++i) {
-        // random select a point on light triangle
-        float rand_x = curand_uniform(curand_state);
-        float rand_y = curand_uniform(curand_state);
-        if (rand_x + rand_y > 1) {
-            rand_x = 1 - rand_x;
-            rand_y = 1 - rand_y;
-        }
-        float3 random_point = add_float3(d_scene_objects[i].tri_a, add_float3(scalar_mult_float3(sub_float3(d_scene_objects[i].tri_b, d_scene_objects[i].tri_a), rand_x), scalar_mult_float3(sub_float3(d_scene_objects[i].tri_c, d_scene_objects[i].tri_a), rand_y)));
-
-        // test block
-        float3 obj_light_direction = sub_float3(random_point, src_point);
-        int test_block_idx;
-        check_obj_hit(-1, src_point, obj_light_direction, test_block_idx);
-        // printf("Direction %f %f %f %d\n", obj_light_direction.x, obj_light_direction.y, obj_light_direction.z, test_block_idx);
-        if (test_block_idx == i) {
-            // printf("Hit Light!\n");
-            float direction_length_square = obj_light_direction.x * obj_light_direction.x + obj_light_direction.y * obj_light_direction.y + obj_light_direction.z * obj_light_direction.z;
-            l_dir += d_light_irradiance * BRDF_rate * dot(d_scene_objects[object_idx].normal_line, obj_light_direction) * -1 * dot(d_scene_objects[i].normal_line, obj_light_direction) 
-                        / direction_length_square / direction_length_square * size(d_scene_objects[i]);
-            // printf("Shade %d %f %f\n", i, dot(d_light_triangle[i].normal_line, obj_light_direction), l_dir);
-        }
-    }
-
-    return l_dir;
-    // Contribution from other reflectors.
-    float l_indir = 0;
-
-    // test Russian Roulette
-    float rr_result = curand_uniform(curand_state);
-    if (rr_result < RR_RATE) {
-        // random select a ray from src_point
-        float cosine_theta = 2 * (curand_uniform(curand_state) - 0.5);
-        float sine_theta = sqrtf(1 - cosine_theta * cosine_theta);
-        float fai_value = 2 * PI * curand_uniform(curand_state);
-        float3 ray_direction = make_float3(sine_theta * cosf(fai_value), sine_theta * sinf(fai_value), cosine_theta);
-        if (dot(ray_direction, d_scene_objects[object_idx].normal_line) < 0) {
-            ray_direction.x *= -1;
-            ray_direction.y *= -1;
-            ray_direction.z *= -1;
-            cosine_theta *= -1;
-        }
-
-        int hit_obj_idx;
-        float3 hit_point = check_obj_hit(object_idx, src_point, ray_direction, hit_obj_idx);
-        if (hit_obj_idx > -1 && !d_scene_objects[hit_obj_idx].is_light) {
-            // printf("Hit Object!\n");
-            ray_direction.x *= -1;
-            ray_direction.y *= -1;
-            ray_direction.z *= -1;
-            l_indir = shade(hit_obj_idx, hit_point, ray_direction, curand_state) * BRDF_rate * dot(ray_direction, d_scene_objects[hit_obj_idx].normal_line) * 2 * PI / RR_RATE;
-        }
-    }
-
-    // printf("Shade %f\n", l_dir + l_indir);
-    return l_dir + l_indir;
-}
-*/
 __device__ float stack_dir[SHARED_MEM_CAP];
 __device__ float stack_indir_rate[SHARED_MEM_CAP];
 
@@ -567,6 +476,8 @@ __device__ __forceinline__ float ray_generation(float3 pixel_center_position, cu
 
 __global__ void render_pixel(unsigned char* target_img, curandState* curand_states)
 {
+    // printf("Hit\n");
+    // printf("%f\n", d_scene_objects[0].tri_a.z);
     int target_pixel_width = blockIdx.x * TILE_SIZE + threadIdx.x;
     int target_pixel_height = blockIdx.y * TILE_SIZE + threadIdx.y;
     // printf("%d, %d\n", target_pixel_width, target_pixel_height);
@@ -605,6 +516,9 @@ __global__ void init_curand(curandState* curand_states, int seed)
 
 int main()
 {
+    string file_path;
+    // cin >> file_path;
+
     dim3 grid{RENDER_WIDTH / TILE_SIZE, RENDER_HEIGHT / TILE_SIZE, 1};
     dim3 block{TILE_SIZE, TILE_SIZE, 1};
 
@@ -615,15 +529,15 @@ int main()
     cudaMalloc(&curand_states, TILE_SIZE * sizeof(curandState));
 
     init_curand <<<1, TILE_SIZE>>> (curand_states, 0);
+
+    load_obb_file(file_path);
+
     cudaDeviceSynchronize();
     cudaError_t cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) 
     {
         fprintf(stderr, "curand init launch failed: %s\n", cudaGetErrorString(cudaStatus));
     }
-
-    // cudaMemcpyToSymbol(d_light_triangle, h_light_triangle, sizeof(Trianle) * LIGHT_TRI_COUNT, cudaMemcpyHostToDevice);
-    cudaMemcpyToSymbol(d_scene_objects, h_scene_objects, sizeof(h_scene_objects));
 
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) 
@@ -655,6 +569,5 @@ int main()
     cudaFree(d_target_img);
     cudaFree(curand_states);
     cudaDeviceReset();
-
     return 0;
 }
