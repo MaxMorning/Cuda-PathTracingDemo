@@ -8,7 +8,7 @@
 #define TILE_SIZE 16
 #define STACK_CAPACITY 128
 #define SHARED_MEM_CAP STACK_CAPACITY * RENDER_WIDTH * RENDER_HEIGHT
-#define SPP 1024
+#define SPP 2048
 #define RR_RATE 0.9
 #define PI 3.1415926
 
@@ -83,70 +83,71 @@ struct Trianle {
     float brdf_rate;
 };
 // Light triagles
-#define LIGHT_TRI_COUNT 4
+#define LIGHT_TRI_COUNT 2
 
-__constant__ float d_light_irradiance = 400;
+__constant__ float d_light_irradiance = 40;
 
 // object triagles
 // No BVH
-#define OBJ_TRI_COUNT 26
+#define BRDF_rate 0.6
+
+#define OBJ_TRI_COUNT 24
 Trianle h_scene_objects[] = {
     // light tri
-    Trianle{float3{110, 110, 300}, float3{110, 190, 300}, float3{190, 110, 300}, float3{0, 0, -1}, true, 0},
-    Trianle{float3{190, 110, 300}, float3{110, 190, 300}, float3{190, 190, 300}, float3{0, 0, -1}, true, 0},
-    Trianle{float3{110, 110, 301}, float3{110, 190, 301}, float3{190, 110, 301}, float3{0, 0, 1}, true, 0},
-    Trianle{float3{190, 110, 301}, float3{110, 190, 301}, float3{190, 190, 301}, float3{0, 0, 1}, true, 0},
+    Trianle{float3{110, 110, 300}, float3{110, 190, 300}, float3{190, 110, 300}, float3{0, 0, -1}, true, BRDF_rate},
+    Trianle{float3{190, 110, 300}, float3{110, 190, 300}, float3{190, 190, 300}, float3{0, 0, -1}, true, BRDF_rate},
+    // Trianle{float3{110, 110, 301}, float3{110, 190, 301}, float3{190, 110, 301}, float3{0, 0, 1}, true, BRDF_rate},
+    // Trianle{float3{190, 110, 301}, float3{110, 190, 301}, float3{190, 190, 301}, float3{0, 0, 1}, true, BRDF_rate},
     // internal box 100 * 100 * 30
     // top
-    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, 0.2},
-    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, 0.2},
+    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, BRDF_rate},
+    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{100, 200, 100}, float3{0, 0, 1}, false, BRDF_rate},
     // bottom
-    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, 0.2},
-    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, 0.2},
+    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, BRDF_rate},
+    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{100, 200, 70}, float3{0, 0, -1}, false, BRDF_rate},
     // front
-    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 100, 70}, float3{0, -1, 0}, false, 0.2},
-    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{200, 100, 100}, float3{0, -1, 0}, false, 0.2},
+    Trianle{float3{100, 100, 100}, float3{200, 100, 100}, float3{100, 100, 70}, float3{0, -1, 0}, false, BRDF_rate},
+    Trianle{float3{100, 100, 70}, float3{200, 100, 70}, float3{200, 100, 100}, float3{0, -1, 0}, false, BRDF_rate},
 
     // behind
-    Trianle{float3{100, 200, 100}, float3{200, 200, 100}, float3{100, 200, 70}, float3{0, 1, 0}, false, 0.2},
-    Trianle{float3{100, 200, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{0, 1, 0}, false, 0.2},
+    Trianle{float3{100, 200, 100}, float3{200, 200, 100}, float3{100, 200, 70}, float3{0, 1, 0}, false, BRDF_rate},
+    Trianle{float3{100, 200, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{0, 1, 0}, false, BRDF_rate},
 
     // left
-    Trianle{float3{100, 100, 100}, float3{100, 200, 100}, float3{100, 100, 70}, float3{-1, 0, 0}, false, 0.25},
-    Trianle{float3{100, 100, 70}, float3{100, 200, 70}, float3{100, 200, 100}, float3{-1, 0, 0}, false, 0.25},
+    Trianle{float3{100, 100, 100}, float3{100, 200, 100}, float3{100, 100, 70}, float3{-1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{100, 100, 70}, float3{100, 200, 70}, float3{100, 200, 100}, float3{-1, 0, 0}, false, BRDF_rate},
 
     // right
-    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{200, 100, 70}, float3{1, 0, 0}, false, 0.2},
-    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{1, 0, 0}, false, 0.2},
+    Trianle{float3{200, 100, 100}, float3{200, 200, 100}, float3{200, 100, 70}, float3{1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{200, 100, 70}, float3{200, 200, 70}, float3{200, 200, 100}, float3{1, 0, 0}, false, BRDF_rate},
 
-    // general box 300 * 300 * 310
+    // general box 300 * 300 * 300.001
     // top
-    Trianle{float3{0, 0, 310}, float3{0, 300, 310}, float3{300, 0, 310}, float3{0, 0, -1}, false, 0.2},
-    Trianle{float3{0, 300, 310}, float3{300, 0, 310}, float3{300, 300, 310}, float3{0, 0, -1}, false, 0.2},
+    Trianle{float3{0, 0, 300.001}, float3{0, 300, 300.001}, float3{300, 0, 300.001}, float3{0, 0, -1}, false, BRDF_rate},
+    Trianle{float3{0, 300, 300.001}, float3{300, 0, 300.001}, float3{300, 300, 300.001}, float3{0, 0, -1}, false, BRDF_rate},
 
     // bottom
-    Trianle{float3{0, 0, 0}, float3{0, 300, 0}, float3{300, 0, 0}, float3{0, 0, 1}, false, 0.2},
-    Trianle{float3{0, 300, 0}, float3{300, 0, 0}, float3{300, 300, 0}, float3{0, 0, 1}, false, 0.2},
+    Trianle{float3{0, 0, 0}, float3{0, 300, 0}, float3{300, 0, 0}, float3{0, 0, 1}, false, BRDF_rate},
+    Trianle{float3{0, 300, 0}, float3{300, 0, 0}, float3{300, 300, 0}, float3{0, 0, 1}, false, BRDF_rate},
 
     // left
-    Trianle{float3{0, 0, 0}, float3{0, 0, 310}, float3{0, 300, 310}, float3{1, 0, 0}, false, 0.25},
-    Trianle{float3{0, 300, 310}, float3{0, 300, 0}, float3{0, 0, 0}, float3{1, 0, 0}, false, 0.25},
+    Trianle{float3{0, 0, 0}, float3{0, 0, 300.001}, float3{0, 300, 300.001}, float3{1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{0, 300, 300.001}, float3{0, 300, 0}, float3{0, 0, 0}, float3{1, 0, 0}, false, BRDF_rate},
 
     // right
-    Trianle{float3{300, 0, 0}, float3{300, 0, 310}, float3{300, 300, 310}, float3{-1, 0, 0}, false, 0.2},
-    Trianle{float3{300, 300, 310}, float3{300, 300, 0}, float3{300, 0, 0}, float3{-1, 0, 0}, false, 0.2},
+    Trianle{float3{300, 0, 0}, float3{300, 0, 300.001}, float3{300, 300, 300.001}, float3{-1, 0, 0}, false, BRDF_rate},
+    Trianle{float3{300, 300, 300.001}, float3{300, 300, 0}, float3{300, 0, 0}, float3{-1, 0, 0}, false, BRDF_rate},
 
     // behind
-    Trianle{float3{0, 300, 0}, float3{0, 300, 310}, float3{300, 300, 0}, float3{0, -1, 0}, false, 0.2},
-    Trianle{float3{300, 300, 0}, float3{300, 300, 310}, float3{0, 300, 310}, float3{0, -1, 0}, false, 0.2}
+    Trianle{float3{0, 300, 0}, float3{0, 300, 300.001}, float3{300, 300, 0}, float3{0, -1, 0}, false, BRDF_rate},
+    Trianle{float3{300, 300, 0}, float3{300, 300, 300.001}, float3{0, 300, 300.001}, float3{0, -1, 0}, false, BRDF_rate}
 };
 
 __constant__ Trianle d_scene_objects[OBJ_TRI_COUNT];
 
-// #define BRDF_rate 0.2
 
 // camera position
-__constant__ float3 d_camera_position = float3{80, -400, 150};
+__constant__ float3 d_camera_position = float3{150, -400, 150};
 __constant__ float3 d_camera_direction = float3{0, 1, 0};
 // 浮点精度考虑，设置较大焦距和成像平面
 __constant__ float d_camera_focal_length = 200;
@@ -346,6 +347,9 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
     float l_dir = 0;
     int stack_offset = ((blockIdx.y * TILE_SIZE + threadIdx.y) * RENDER_WIDTH + (blockIdx.x * TILE_SIZE + threadIdx.x)) * STACK_CAPACITY;
     int stack_ori = stack_offset;
+    float3 out_direction = direction; // use in BRDF, here is ignored.
+    float3 ray_src = src_point;
+    int src_object_idx = object_idx;
     while (true) {
         // Contribution from the light source.
         l_dir = 0;
@@ -360,14 +364,14 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
             float3 random_point = add_float3(d_scene_objects[i].tri_a, add_float3(scalar_mult_float3(sub_float3(d_scene_objects[i].tri_b, d_scene_objects[i].tri_a), rand_x), scalar_mult_float3(sub_float3(d_scene_objects[i].tri_c, d_scene_objects[i].tri_a), rand_y)));
     
             // test block
-            float3 obj_light_direction = sub_float3(random_point, src_point);
+            float3 obj_light_direction = sub_float3(random_point, ray_src);
             int test_block_idx;
-            check_obj_hit(-1, src_point, obj_light_direction, test_block_idx);
+            check_obj_hit(-1, ray_src, obj_light_direction, test_block_idx);
             // printf("Direction %f %f %f %d\n", obj_light_direction.x, obj_light_direction.y, obj_light_direction.z, test_block_idx);
             if (test_block_idx == i) {
                 // printf("Hit Light!\n");
                 float direction_length_square = obj_light_direction.x * obj_light_direction.x + obj_light_direction.y * obj_light_direction.y + obj_light_direction.z * obj_light_direction.z;
-                l_dir += d_light_irradiance * d_scene_objects[object_idx].brdf_rate * dot(d_scene_objects[object_idx].normal_line, obj_light_direction) * -1 * dot(d_scene_objects[i].normal_line, obj_light_direction) 
+                l_dir += d_light_irradiance * d_scene_objects[src_object_idx].brdf_rate * dot(d_scene_objects[src_object_idx].normal_line, obj_light_direction) * -1 * dot(d_scene_objects[i].normal_line, obj_light_direction) 
                             / direction_length_square / direction_length_square * size(d_scene_objects[i]);
                 // printf("Shade %d %f %f\n", i, dot(d_light_triangle[i].normal_line, obj_light_direction), l_dir);
             }
@@ -383,7 +387,7 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
             float sine_theta = sqrtf(1 - cosine_theta * cosine_theta);
             float fai_value = 2 * PI * curand_uniform(curand_state);
             float3 ray_direction = make_float3(sine_theta * cosf(fai_value), sine_theta * sinf(fai_value), cosine_theta);
-            if (dot(ray_direction, d_scene_objects[object_idx].normal_line) < 0) {
+            if (dot(ray_direction, d_scene_objects[src_object_idx].normal_line) < 0) {
                 ray_direction.x *= -1;
                 ray_direction.y *= -1;
                 ray_direction.z *= -1;
@@ -391,18 +395,27 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
             }
 
             int hit_obj_idx;
-            float3 hit_point = check_obj_hit(object_idx, src_point, ray_direction, hit_obj_idx);
+            float3 hit_point = check_obj_hit(src_object_idx, ray_src, ray_direction, hit_obj_idx);
             if (hit_obj_idx > -1 && !d_scene_objects[hit_obj_idx].is_light) {
                 // printf("Hit Object!\n");
                 ray_direction.x *= -1;
                 ray_direction.y *= -1;
                 ray_direction.z *= -1;
-                indir_rate = d_scene_objects[hit_obj_idx].brdf_rate * dot(ray_direction, d_scene_objects[hit_obj_idx].normal_line) * 2 * PI / RR_RATE;
+                indir_rate = d_scene_objects[hit_obj_idx].brdf_rate * dot(ray_direction, d_scene_objects[hit_obj_idx].normal_line) * 2 / RR_RATE;
+                src_object_idx = hit_obj_idx;
+                ray_src = hit_point;
+                out_direction = ray_direction;
+
+                stack_dir[stack_offset] = l_dir;
+                stack_indir_rate[stack_offset] = indir_rate;
+                ++stack_offset;
             }
-            // int stack_offset = (threadIdx.y * TILE_SIZE + threadIdx.x) * STACK_CAPACITY + stack_size;
-            stack_dir[stack_offset] = l_dir;
-            stack_indir_rate[stack_offset] = indir_rate;
-            ++stack_offset;
+            else {
+                // stack_dir[stack_offset] = l_dir;
+                // stack_indir_rate[stack_offset] = indir_rate;
+                // ++stack_offset;
+                break;
+            }
         }
         else {
             break;
@@ -410,14 +423,8 @@ __device__ float shade(int object_idx, float3 src_point, float3 direction, curan
     }
 
     // calc final irradiance
-    // --stack_offset;
-    // while (stack_offset >= (threadIdx.y * TILE_SIZE + threadIdx.x) * STACK_CAPACITY) {
-    //     l_dir *= stack_indir_rate[stack_offset];
-    //     l_dir += stack_dir[stack_offset];
-    //     --stack_offset;
-    // }
     for (int i = stack_offset - 1; i >= stack_ori; --i) {
-        // printf("%f %f\n", stack_indir_rate[i], stack_dir[i])
+        // printf("%f %f\n", stack_indir_rate[i], stack_dir[i]);
         l_dir *= stack_indir_rate[i];
         l_dir += stack_dir[i];
     }
@@ -470,11 +477,15 @@ __global__ void render_pixel(unsigned char* target_img, curandState* curand_stat
     float pixel_radiance = ray_generation(pixel_center, curand_states);
     // float pixel_radiance = d_light_irradiance * curand_uniform(&curand_states[threadIdx.x]);
 
-    // printf("%d, %d : %f\n", target_pixel_width, target_pixel_height, pixel_radiance);
-    if (pixel_radiance > d_light_irradiance) {
-        pixel_radiance = d_light_irradiance;
+    // Gamma correction
+    pixel_radiance /= d_light_irradiance;
+    if (pixel_radiance > 1) {
+        pixel_radiance = 1;
     }
-    unsigned char rgb_value = (unsigned char)(pixel_radiance / d_light_irradiance * 255);
+    pixel_radiance = powf(pixel_radiance, 0.454545454545);
+
+    
+    unsigned char rgb_value = (unsigned char)(pixel_radiance * 255);
     // printf("%d, %d : %d\n", target_pixel_width, target_pixel_height, rgb_value);
     int base_idx = 3 * (target_pixel_height * RENDER_WIDTH + target_pixel_width);
     target_img[base_idx] = rgb_value;
